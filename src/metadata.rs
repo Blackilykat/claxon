@@ -68,8 +68,7 @@ pub struct SeekPoint {
 /// A seek table to aid seeking in the stream.
 pub struct SeekTable {
     /// The seek points, sorted in ascending order by sample number.
-    #[allow(dead_code)] // TODO: Implement seeking.
-    seekpoints: Vec<SeekPoint>,
+    pub seekpoints: Vec<SeekPoint>,
 }
 
 /// Vorbis comments, also known as FLAC tags (e.g. artist, title, etc.).

@@ -14,6 +14,8 @@
 
 use std::cmp;
 use std::io;
+use std::io::Seek;
+use std::io::SeekFrom;
 
 /// Similar to `std::io::BufRead`, but more performant.
 ///
@@ -211,6 +213,34 @@ impl<R: io::Read> ReadBytes for BufferedReader<R>
     }
 }
 
+impl<R: Seek + io::Read> Seek for BufferedReader<R> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let pos = match pos {
+            SeekFrom::Current(current) => {
+                // No need to rewind inner if the old data is still in the buffer
+                if current < 0 && (self.pos as i64) >= -current {
+                    self.pos -= (-current) as u32;
+
+                    return self.inner.stream_position().map(|pos| {
+                        pos - (self.num_valid - self.pos) as u64
+                    })
+                }
+
+                SeekFrom::Current(current - ((self.num_valid - self.pos) as i64))
+            }
+            other => other
+        };
+        let res = self.inner.seek(pos);
+
+        if res.is_ok() {
+            self.pos = 0;
+            self.num_valid = 0;
+        }
+
+        res
+    }
+}
+
 impl<'r, R: ReadBytes> ReadBytes for &'r mut R {
 
     #[inline(always)]
@@ -389,6 +419,24 @@ fn verify_read_le_u32_cursor() {
     assert_eq!(reader.read_le_u32().ok(), Some(2));
     assert_eq!(reader.read_le_u32().ok(), Some(2_147_614_697));
     assert!(reader.read_le_u32().is_err());
+}
+
+#[test]
+fn verify_seek_buffered_reader() {
+    let mut reader = BufferedReader::new(io::Cursor::new(vec![0u8, 2, 129, 89, 122]));
+    assert_eq!(reader.read_u8().unwrap(), 0);
+    reader.seek_relative(2).unwrap();
+    assert_eq!(reader.read_u8().unwrap(), 89);
+    assert_eq!(reader.read_u8().unwrap(), 122);
+    reader.seek_relative(-2).unwrap();
+    assert_eq!(reader.read_u8().unwrap(), 89);
+    assert_eq!(reader.read_u8().unwrap(), 122);
+    reader.seek(io::SeekFrom::Start(0)).unwrap();
+    assert_eq!(reader.read_u8().unwrap(), 0);
+    assert_eq!(reader.read_u8().unwrap(), 2);
+    reader.seek(io::SeekFrom::End(-1)).unwrap();
+    assert_eq!(reader.read_u8().unwrap(), 122);
+    assert!(reader.read_u8().is_err());
 }
 
 /// Left shift that does not panic when shifting by the integer width.
