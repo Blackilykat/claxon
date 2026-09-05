@@ -136,23 +136,19 @@ fn read_frame_header_or_eof<R: ReadBytes>(input: &mut R) -> Result<Option<FrameH
     // that computes the CRC.
     let mut crc_input = Crc8Reader::new(input);
 
-    let sync_res_block = loop {
-        // First are 14 bits frame sync code, a reserved bit, and blocking stategy.
-        // If instead of the two bytes we find the end of the stream, return
-        // `Nothing`, indicating EOF.
-        let sync_res_block = match try!(crc_input.read_be_u16_or_eof()) {
-            None => return Ok(None),
-            Some(x) => x,
-        };
-
-        // The first 14 bits must be 11111111111110.
-        let sync_code = sync_res_block & 0b1111_1111_1111_1100;
-        if sync_code != 0b1111_1111_1111_1000 {
-            continue;
-        }
-
-        break sync_res_block;
+    // First are 14 bits frame sync code, a reserved bit, and blocking stategy.
+    // If instead of the two bytes we find the end of the stream, return
+    // `Nothing`, indicating EOF.
+    let sync_res_block = match try!(crc_input.read_be_u16_or_eof()) {
+        None => return Ok(None),
+        Some(x) => x,
     };
+
+    // The first 14 bits must be 11111111111110.
+    let sync_code = sync_res_block & 0b1111_1111_1111_1100;
+    if sync_code != 0b1111_1111_1111_1000 {
+        return fmt_err("frame sync code missing");
+    }
 
     // The next bit has a mandatory value of 0 at the moment of writing. The
     // spec says "0: mandatory value, 1: reserved for future use". As it is
