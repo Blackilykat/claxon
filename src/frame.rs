@@ -7,14 +7,14 @@
 
 //! The `frame` module deals with the frames that make up a FLAC stream.
 
-use std::{cmp::Ordering, i32, io::{Seek, SeekFrom}, ops::Range};
+use std::{cmp::Ordering, io::{Seek, SeekFrom}, ops::Range};
 
 use crc::{Crc8Reader, Crc16Reader};
 use error::{Error, Result, fmt_err};
 use input::{Bitstream, ReadBytes};
 use subframe;
 
-use crate::{FlacReader, metadata::{SeekPoint, SeekTable, StreamInfo}};
+use crate::{metadata::{SeekPoint, SeekTable}};
 
 #[derive(Clone, Copy)]
 enum BlockingStrategy {
